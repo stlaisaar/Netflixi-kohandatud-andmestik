@@ -96,7 +96,7 @@ def modify_country_data(df):
     countries_df['interneti_kasutajad'] = internet_users
 
     # Kirjutame DataFrame'i riigid.csv faili
-    countries_df.to_csv('riigid.csv', encoding='utf8', header=False, quoting=csv.QUOTE_NONNUMERIC, quotechar='"')
+    countries_df.to_csv('riigid.csv', sep='\t', encoding='utf8', header=False)
 
     # Tagastame üldise DataFrame'i, milles asendasime riikide nimed ID-dega
     return df
@@ -130,7 +130,7 @@ def modify_people_data(df):
     # Loome tagurpidise sõnastiku põhjal kõigi isikute DataFrame'i ja kirjutame selle isikud.csv faili
     people_df = pd.DataFrame.from_dict(reverse_people_dict, orient='index', columns=['nimi'])
     people_df.index.name = 'id'
-    people_df.to_csv('isikud.csv', encoding='utf8', header=False, quoting=csv.QUOTE_NONNUMERIC, quotechar='"')
+    people_df.to_csv('isikud.csv', sep='\t', encoding='utf8', header=False, quoting=csv.QUOTE_NONNUMERIC, quotechar='"')
 
     # Käime läbi kõik näitlejad üldises DataFrame's, kui näitlejaid on mitu, loome iga näitleja ja vastava filmi põhjal
     # kolmeelemendilise listi kujuga [id, teose_id, näitleja_id] ja lisame selle omakorda listi acting_csv_rows, kui
@@ -156,8 +156,7 @@ def modify_people_data(df):
 
     # Teeme acting_csv_rows põhjal näitlemise DataFrame'i ning kirjutame selle faili näitlemine.csv
     acting_df = pd.DataFrame(acting_csv_rows, columns=['id', 'teose_id', 'naitleja_id'])
-    acting_df.to_csv('näitlemine.csv', encoding='utf8', index=False, header=False, quoting=csv.QUOTE_NONNUMERIC,
-                     quotechar='"')
+    acting_df.to_csv('näitlemine.csv', sep='\t', encoding='utf8', index=False, header=False)
 
     # Käime läbi kõik lavastajad üldises DataFrame's, kui lavastajaid on mitu, loome iga lavastaja ja vastava filmi
     # põhjal kolmeelemendilise listi kujuga [id, teose_id, lavastaja_id] ja lisame selle omakorda listi
@@ -184,8 +183,7 @@ def modify_people_data(df):
 
     # Teeme directing_csv_rows põhjal näitlemise DataFrame'i ning kirjutame selle faili näitlemine.csv
     directing_df = pd.DataFrame(directing_csv_rows, columns=['id', 'teose_id', 'lavastaja_id'])
-    directing_df.to_csv('lavastamine.csv', encoding='utf8', index=False, header=False, quoting=csv.QUOTE_NONNUMERIC,
-                        quotechar='"')
+    directing_df.to_csv('lavastamine.csv', sep='\t', encoding='utf8', index=False, header=False)
 
     # Kustutame üldisest DataFrame'st lavastajate ja näitlejate veerud, sest neid pole seal enam vaja
     del df['director']
@@ -203,6 +201,9 @@ def modify_show_movie_data(df):
     df['listed_in'] = df['listed_in'].apply(keep_first)
     # Teisendame teose lisamise kuupäeva SQL-le sobivale kujule
     df['date_added'] = df['date_added'].apply(format_date)
+    # Lisame filmi nimele ja kirjeldusele jutumärgid ümber, et toetataks nende väärtustes ka eripäraseid märke
+    df['title'] = df['title'].apply(lambda x: '"' + x + '"')
+    df['description'] = df['description'].apply(lambda x: '"' + x + '"')
     df.columns = ['on_film', 'pealkiri', 'riigi_id', 'lisamise_kuupaev', 'valjalaske_aasta', 'vanusepiirang', 'kestus',
                   'zanr', 'kirjeldus']
     df.index.names = ['id']
@@ -270,7 +271,7 @@ def create_csvs():
 
     # Kirjutame üldise DataFrame'i faili teosed.csv, sest üldisesse DataFrame'i on alles jäänud vaid teostega seotud
     # andmed
-    df.to_csv('teosed.csv', encoding='utf8', header=False, quoting=csv.QUOTE_NONNUMERIC, quotechar='"')
+    df.to_csv('teosed.csv', sep='\t', encoding='utf8', header=False, quoting=csv.QUOTE_NONE, escapechar='\\')
 
 
 create_csvs()
