@@ -7,12 +7,17 @@ def modify_country_data(df):
     # Juhul, kui filmi/sarja tegid mitu riiki, jätame alles vaid ühe
     df['country'] = df['country'].apply(keep_first)
 
-    # Jätame alles unikaalsed riigid, sorteerime need, eemaldame tühja väärtuse, loome sõnastiku, kus võtmeteks on
-    # riikide nimed ja väärtusteks on ID-d (alates 1st kasvavalt), asendame riikide nimed ID-dega
+    # Jätame alles unikaalsed riigid, sorteerime need, eemaldame tühja väärtuse ja riigid Soviet Union, West Germany,
+    # Taiwan, sest nendele pole vastavaid lisaandmeid, loome sõnastiku, kus võtmeteks on riikide nimed ja väärtusteks on
+    # ID-d (alates 1st kasvavalt), asendame riikide nimed ID-dega
     unique_countries = sorted(df['country'].unique().tolist())
     unique_countries.remove("")
+    unique_countries.remove("Soviet Union")
+    unique_countries.remove("West Germany")
+    unique_countries.remove("Taiwan")
     countries_dict = {unique_countries[i]: i + 1 for i in range(0, len(unique_countries))}
-    df = df.replace({"country": countries_dict})
+    df['country'] = df['country'].apply(
+        lambda x: countries_dict[x] if x not in ["Soviet Union", "West Germany", "Taiwan"] and x != "" else "")
 
     # Loome ümberpööratud võtme-väärtuse paaridega sõnastiku, loome riikidele vastava DataFrame'i, määrame
     # indeksiveeru nimeks 'id'
@@ -36,52 +41,53 @@ def modify_country_data(df):
     areas = []
     gdps = []
     internet_users = []
-    # Käime läbi kõik riigid riikide DataFrame's (riigid on siinkohal tähestiku järjekorras), leiame riigi nime abil
-    # hiljuti sisse loetud lisaandmete failist lisaandmeid vastava riigi kohta ja lisame need eelnevalt loodud
-    # vastavasse listi (population, areas, gdps või internet_users)
+    # Käime läbi kõik riigid riikide DataFrame's (riigid on siinkohal tähestiku järjekorras, ei tee midagi, kui riik
+    # puudub), leiame riigi nime abil hiljuti sisse loetud lisaandmete failist lisaandmeid vastava riigi kohta ja lisame
+    # need eelnevalt loodud vastavasse listi (population, areas, gdps või internet_users)
     for country in countries_df['nimi']:
-        try:
-            temp_df = additional_country_data_df.loc[additional_country_data_df.country == country]
-            if not temp_df.empty:
-                # Korrutame rahvaaarvu tuhandega, kuna lisaandmetes oli rahvaarv tuhandetes
-                population = temp_df['Population in thousands (2017)'].values[0]
-                if population == -99:
+        if country != "":
+            try:
+                temp_df = additional_country_data_df.loc[additional_country_data_df.country == country]
+                if not temp_df.empty:
+                    # Korrutame rahvaaarvu tuhandega, kuna lisaandmetes oli rahvaarv tuhandetes
+                    population = temp_df['Population in thousands (2017)'].values[0]
+                    if population == -99:
+                        populations.append("")
+                    else:
+                        populations.append(int(population * 1000))
+
+                    area = temp_df['Surface area (km2)'].values[0]
+                    if area == -99:
+                        areas.append("")
+                    else:
+                        areas.append(area)
+
+                    # Korrutame SKP väärtuse 0.82-ga, sest Google'st otsides oli 25/02/2021 seisuga 1 dollar väärt 0.82
+                    # eurot
+                    gdp = temp_df['GDP per capita (current US$)'].values[0]
+                    if gdp == -99:
+                        gdps.append("")
+                    else:
+                        gdps.append(round((gdp * 0.82), 1))
+
+                    # Asendame interneti kasutajate väärtuses olnud ',' '.'-ga ning lõpuks ümardame selle täisarvuks
+                    internet_user = temp_df['Individuals using the Internet (per 100 inhabitants)'].values[0]
+                    if internet_user == -99:
+                        internet_users.append("")
+                    else:
+                        internet_users.append(int(round(float(str(internet_user).replace(",", ".")))))
+                # Kui mingi riigi kohta lisaandmeid ei leidnud, lisame igasse listi tühja väärtuse (sõne)
+                else:
                     populations.append("")
-                else:
-                    populations.append(int(population * 1000))
-
-                area = temp_df['Surface area (km2)'].values[0]
-                if area == -99:
                     areas.append("")
-                else:
-                    areas.append(area)
-
-                # Korrutame SKP väärtuse 0.82-ga, sest Google'st otsides oli 25/02/2021 seisuga 1 dollar väärt 0.82
-                # eurot
-                gdp = temp_df['GDP per capita (current US$)'].values[0]
-                if gdp == -99:
                     gdps.append("")
-                else:
-                    gdps.append(round((gdp * 0.82), 1))
-
-                # Asendame interneti kasutajate väärtuses olnud ',' '.'-ga ning lõpuks ümardame selle täisarvuks
-                internet_user = temp_df['Individuals using the Internet (per 100 inhabitants)'].values[0]
-                if internet_user == -99:
                     internet_users.append("")
-                else:
-                    internet_users.append(int(round(float(str(internet_user).replace(",", ".")))))
-            # Kui mingi riigi kohta lisaandmeid ei leidnud, lisame igasse listi tühja väärtuse (sõne)
-            else:
+            # Kui esineb mingi probleem lisaandmete saamisel, lisame igasse listi tühja väärtuse (sõne)
+            except KeyError:
                 populations.append("")
                 areas.append("")
                 gdps.append("")
                 internet_users.append("")
-        # Kui esineb mingi probleem lisaandmete saamisel, lisame igasse listi tühja väärtuse (sõne)
-        except KeyError:
-            populations.append("")
-            areas.append("")
-            gdps.append("")
-            internet_users.append("")
 
     # Asendame riikide DataFrame'i veergude väärtused listidest saadud väärtustega
     countries_df['rahvastikuarv'] = populations
@@ -150,7 +156,8 @@ def modify_people_data(df):
 
     # Teeme acting_csv_rows põhjal näitlemise DataFrame'i ning kirjutame selle faili näitlemine.csv
     acting_df = pd.DataFrame(acting_csv_rows, columns=['id', 'teose_id', 'naitleja_id'])
-    acting_df.to_csv('näitlemine.csv', encoding='utf8', index=False, header=False, quoting=csv.QUOTE_NONNUMERIC, quotechar='"')
+    acting_df.to_csv('näitlemine.csv', encoding='utf8', index=False, header=False, quoting=csv.QUOTE_NONNUMERIC,
+                     quotechar='"')
 
     # Käime läbi kõik lavastajad üldises DataFrame's, kui lavastajaid on mitu, loome iga lavastaja ja vastava filmi
     # põhjal kolmeelemendilise listi kujuga [id, teose_id, lavastaja_id] ja lisame selle omakorda listi
@@ -177,7 +184,8 @@ def modify_people_data(df):
 
     # Teeme directing_csv_rows põhjal näitlemise DataFrame'i ning kirjutame selle faili näitlemine.csv
     directing_df = pd.DataFrame(directing_csv_rows, columns=['id', 'teose_id', 'lavastaja_id'])
-    directing_df.to_csv('lavastamine.csv', encoding='utf8', index=False, header=False, quoting=csv.QUOTE_NONNUMERIC, quotechar='"')
+    directing_df.to_csv('lavastamine.csv', encoding='utf8', index=False, header=False, quoting=csv.QUOTE_NONNUMERIC,
+                        quotechar='"')
 
     # Kustutame üldisest DataFrame'st lavastajate ja näitlejate veerud, sest neid pole seal enam vaja
     del df['director']
